@@ -113,7 +113,7 @@ def main():
     image_frame.grid(row=0, column=0, padx=30, pady=20, sticky="nsew")
     # two buttons (for encryption and decryption)
     create_button(image_frame, "Encrypt Image", encrypt_image, "#4CAF50", 0, 0) # green
-    create_button(image_frame, "Decrypt Image", decrypt_image, "#f44336", 0, 1) # red
+    create_button(image_frame, "Decrypt Image", decrypt_image, "#f44336", 0, 1) # red 
 
     # Text Section
     text_frame = tk.LabelFrame(content, text="Text File Operations", bg="#2e2e3f", fg="white", font=("Segoe UI", 14, "bold"))
