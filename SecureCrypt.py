@@ -1,135 +1,160 @@
-import tkinter as tk #for building GUI
-from tkinter import messagebox, simpledialog, filedialog # for pop-up window, file selection, and taking inputs
-import imageEncDec # importing module for image encryption/decryption
-import TextEncDec # importign module for image encryption/decryption
-import requests # send HTTP request for connection to flask servers
-import os # for handling files in the directory
+import streamlit as st  # used for web based front end
+import requests  # for sending POST request to flask for comparison 
+import os  # used for saving/reading files from system
 
-def encrypt_image(): # call module for encryption of image
-    try:
-        imageEncDec.encrypt_image()
-    except Exception as e:
-        messagebox.showerror("Error", f"Encryption failed: {e}")
+from TextEncDec import (  # importing the functions 
+    xor_encrypt_decrypt,
+    generate_random_key,
+    generate_pseudo_random_key,
+    read_file,
+    read_text_file,
+    write_text_file,
+    write_binary_file
+)
 
-def decrypt_image(): # call module for decryption of image
-    try:
-        imageEncDec.decrypt_image()
-    except Exception as e:
-        messagebox.showerror("Error", f"Decryption failed: {e}")
+# create a folder "outputs" to store the encrypted/decrypted files
+DOWNLOAD_DIR = "outputs"
+os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
-def encrypt_text(): # call module for encryption of text file
-    method = messagebox.askquestion("Encryption Type", "Use pseudo-random key?\nClick 'Yes' for pseudo-random, 'No' for random.")
-    if method == "yes":
-        TextEncDec.encrypt_file("pseudo")
-    else:
-        TextEncDec.encrypt_file("random")   
+st.set_page_config(page_title="SecureCrypt", layout="centered")  # set page title and center the layout of the web page
 
-def decrypt_text(): # call module for decryption of text file
-    try:
-        TextEncDec.decrypt_file()
-    except Exception as e:
-        messagebox.showerror("Error", f"Decryption failed: {e}")
+st.title("🔐 SecureCrypt User Interface")  # Display the main title of the page at the top of the pages
 
-def compare_encryption(): # comparing security of both keys
-    file_path = filedialog.askopenfilename(title="Select file to compare encryption") # opens a dialog ox for user to select file
-    if not file_path or not os.path.exists(file_path): # if file is not selected, stops
-        messagebox.showerror("Error", "File not selected or not found.")
-        return
+# creates a sidebar with radio buttons that allows user to choose the operation they wants to perform on the files
+# the ui will change based on the users selection
+menu = st.sidebar.radio("Choose Operation", [
+    "Encrypt Image",
+    "Decrypt Image",
+    "Encrypt Text File",
+    "Decrypt Text File",
+    "Compare Random vs Pseudo-Random"
+    ])
 
-    # ask user for seed value for pseudo-random encryption (default:- pseudo123)
-    seed = simpledialog.askstring("Enter Seed", "Enter seed value for pseudo-random encryption:", initialvalue="pseudo123")
-    if not seed: # if key is not provided, stop
-        messagebox.showwarning("Warning", "Seed value not provided.")
-        return
+def save_file(uploaded_file):  # function for saving files to our system
+    path = os.path.join(DOWNLOAD_DIR, uploaded_file.name)  # create a path to the folder where the files are to be saved
+    with open(path, "wb") as f:  # open file in write-binary mode (to handle images)
+        f.write(uploaded_file.read())  # write content of generated file in the opened file
+    return path  # return the saved file path to be used later
 
-    try:
-        with open(file_path, "rb") as f: # open file in binary mode since data is sent in raw form in a POST request
-            files = {'file': (os.path.basename(file_path), f)} # sents the name of the file to the server
-            data = {'seed': seed}
-            # sends file with seed to local flask server via POST request
-            response = requests.post("http://127.0.0.1:5000/compare", files=files, data=data)
-            if response.status_code == 200: # responcse code 200 indicates the request is sent successfully
-                result = response.json() # parses the server's JSON response into a dictionary
-                # print approprite message in the dialog box after comparison (from compare_encryption module)
-                info = (
-                    f"Random Key:\n"
-                    f"• Entropy: {result['random']['entropy']}\n"
-                    f"• Time: {result['random']['encryption_time']}s\n\n"
-                    f"Pseudo-random Key:\n"
-                    f"• Entropy: {result['pseudo_random']['entropy']}\n"
-                    f"• Time: {result['pseudo_random']['encryption_time']}s\n\n"
-                    f"{result['recommended']}"
-                )
-                messagebox.showinfo("Comparison Result", info)
-            else:
-                messagebox.showerror("Error", f"Server Error: {response.text}")
-    except Exception as e:
-        messagebox.showerror("Error", f"Comparison failed: {str(e)}")
+# if Encrypt Image menu is selected from side bar
+if menu == "Encrypt Image":
+    st.header("🖼️ Encrypt Image")  # title of the page
+    uploaded_file = st.file_uploader("Upload an image file", type=["png", "jpg", "jpeg", "bmp"])  # let user upload image file in these formats
+    use_pseudo = st.radio("Key Type", ["Random", "Pseudo-Random"])  # using radio buttons, ask user for type of key to use for encryption
 
-def create_button(frame, text, command, color, row, col):
-    btn = tk.Button(
-        frame, # main frame window
-        text=text, # text to display on the button
-        command=command, # the function to be executed when the button is pressed
-        width=25, # size of the button
-        height=2,
-        font=("Segoe UI", 16), 
-        bg=color,
-        fg="white",
-        activebackground="#444", # bg colour when the button is pressed
-        relief=tk.RAISED, # 3D effect when button is presssed
-        bd=3 # border width
-    )
-    btn.grid(row=row, column=col, padx=20, pady=15) # place the at the given position in the main window in a grid layout, spaceing b/w uttona dn edges
+    if use_pseudo == "Pseudo-Random":  # if pseudo random key is selected, ask user for seed value
+        seed = st.text_input("Enter Seed Value: ")
 
-def main():
-    window = tk.Tk() # create main window of the application
-    window.title("File Encryption & Analysis System")
-    window.state('zoomed')  # make window in full screen mode
+    if uploaded_file and st.button("Encrypt"):  # when file is entered and user click encrypt button
+        img_path = save_file(uploaded_file)  # call save_file() function and save file to the outputs folder
+        key = generate_pseudo_random_key(seed, os.path.getsize(img_path)) if use_pseudo == "Pseudo-Random" else generate_random_key(os.path.getsize(img_path))  # generate key accordingly
+        data = read_file(img_path)  # reads image data
+        encrypted_data = xor_encrypt_decrypt(data, key)  # perform XOR encryption
+        # build files for encrypted image and its key for decryption
+        enc_path = os.path.join(DOWNLOAD_DIR, uploaded_file.name + ".encimg")
+        key_path = os.path.join(DOWNLOAD_DIR, uploaded_file.name + ".key.txt")
+        # save these files to the system
+        write_binary_file(enc_path, encrypted_data)
+        write_text_file(key_path, key.hex())
+        # gives a successful message and give user two button to download these two files
+        st.success("Image encrypted successfully!")
+        st.download_button("Download Encrypted Image", data=open(enc_path, "rb"), file_name=os.path.basename(enc_path))
+        st.download_button("Download Key", data=open(key_path), file_name=os.path.basename(key_path))
 
-    window.configure(bg="#1e1e2f") # set background colour
+# Decrypt Image 
+elif menu == "Decrypt Image":
+    st.header("🖼️ Decrypt Image")  # title of the page
+    enc_file = st.file_uploader("Upload Encrypted Image (.encimg)", type=["encimg"])  # upload encrypted image
+    key_file = st.file_uploader("Upload Key (.txt)", type=["txt"])  # upload key used during encryption
 
-    header = tk.Label( # create a lable as heading the GUI window
-        window,
-        text="File Encryption & Analysis Dashboard",
-        font=("Segoe UI", 20, "bold"),
-        bg="#1e1e2f",
-        fg="#ffffff", # white
-        pady=20
-    )
-    header.pack() # place the header onto the window
+    if enc_file and key_file and st.button("Decrypt"):  # proceed when both files are selected
+        enc_path = save_file(enc_file)  # save encrypted image
+        key_path = save_file(key_file)  # save key file
+        data = read_file(enc_path)  # read image data
+        key = bytes.fromhex(read_text_file(key_path))  # convert key from hex to bytes
 
-    # a container frame to hold different componentes like buttons, sections, etc
-    content = tk.Frame(window, bg="#2e2e3f")
-    # making them spaced out to avoid clustering of compenents, and allow them to grow and skrink with window size
-    content.pack(pady=10, fill="both", expand=True)
+        if len(key) != len(data):  # verify key size
+            st.error("Key and data length mismatch!")  # show error if sizes don't match
+        else:
+            decrypted = xor_encrypt_decrypt(data, key)  # perform decryption
+            out_path = enc_path.replace(".encimg", ".decrypted.jpg")  # output filename
+            write_binary_file(out_path, decrypted)  # save decrypted image
+            st.success("Image decrypted successfully!")
+            st.image(out_path)  # preview image on screen
+            st.download_button("Download Decrypted Image", data=open(out_path, "rb"), file_name=os.path.basename(out_path))  # download button
 
-    # arrange the container in a grid setup
-    content.columnconfigure((0, 1), weight=1)
-    content.rowconfigure((0, 1, 2), weight=1)
+# Encrypt Text 
+elif menu == "Encrypt Text File":
+    st.header("📄 Encrypt Text File")  # title of the page
+    uploaded_file = st.file_uploader("Upload a text file", type=["txt", "log", "csv"])  # upload any valid text file
+    use_pseudo = st.radio("Key Type", ["Random", "Pseudo-Random"])  # ask user to choose key type
 
-    # Image Section
-    image_frame = tk.LabelFrame(content, text="Image Operations", bg="#2e2e3f", fg="white", font=("Segoe UI", 14, "bold"))
-    image_frame.grid(row=0, column=0, padx=30, pady=20, sticky="nsew")
-    # two buttons (for encryption and decryption)
-    create_button(image_frame, "Encrypt Image", encrypt_image, "#4CAF50", 0, 0) # green
-    create_button(image_frame, "Decrypt Image", decrypt_image, "#f44336", 0, 1) # red 
+    if use_pseudo == "Pseudo-Random":
+        seed = st.text_input("Enter Seed Value")  # input seed value for deterministic key
 
-    # Text Section
-    text_frame = tk.LabelFrame(content, text="Text File Operations", bg="#2e2e3f", fg="white", font=("Segoe UI", 14, "bold"))
-    text_frame.grid(row=1, column=0, padx=30, pady=20, sticky="nsew")
-    # two buttons (for encryption and decryption)
-    create_button(text_frame, "Encrypt Text File", encrypt_text, "#4CAF50", 0, 0) # green
-    create_button(text_frame, "Decrypt Text File", decrypt_text, "#f44336", 0, 1) # red
+    if uploaded_file and st.button("Encrypt"):
+        file_path = save_file(uploaded_file)  # save uploaded file
+        data = read_file(file_path)  # read file content
+        key = generate_pseudo_random_key(seed, len(data)) if use_pseudo == "Pseudo-Random" else generate_random_key(len(data))  # generate key
+        encrypted = xor_encrypt_decrypt(data, key)  # encrypt using XOR
+        encrypted_hex = encrypted.hex()  # convert to hex for readable storage
 
-    # Comparison Section
-    compare_frame = tk.LabelFrame(content, text="Compare Random vs Pseudo Encryption", bg="#2e2e3f", fg="white", font=("Segoe UI", 14, "bold"))
-    compare_frame.grid(row=0, column=1, rowspan=2, padx=30, pady=20, sticky="nsew")
+        enc_file = file_path + ".enc.txt"  # encrypted file name
+        key_file = file_path + ".key.txt"  # key file name
+        write_text_file(enc_file, encrypted_hex)  # save encrypted data
+        write_text_file(key_file, key.hex())  # save key
 
-    create_button(compare_frame, "Compare Encryption Methods", compare_encryption, "#2196F3", 0, 0) # blue
+        st.success("Text encrypted successfully!")  # show success
+        st.download_button("Download Encrypted Text", data=open(enc_file), file_name=os.path.basename(enc_file))  # download button for data
+        st.download_button("Download Key", data=open(key_file), file_name=os.path.basename(key_file))  # download button for key
 
-    window.mainloop() # keep the window active until user manually closes it
+# Decrypt Text 
+elif menu == "Decrypt Text File":
+    st.header("📄 Decrypt Text File")  # title
+    enc_file = st.file_uploader("Upload .enc.txt File", type=["txt"])  # encrypted file
+    key_file = st.file_uploader("Upload Key (.txt)", type=["txt"])  # key file
 
-# only execute the this file is run directly, not when used as a module
-if __name__ == "__main__":
-    main()
+    if enc_file and key_file and st.button("Decrypt"):  # proceed when both are given
+        enc_path = save_file(enc_file)  # save encrypted file
+        key_path = save_file(key_file)  # save key file
+        try:
+            encrypted = bytes.fromhex(read_text_file(enc_path))  # convert hex to bytes
+            key = bytes.fromhex(read_text_file(key_path))  # convert key
+            decrypted = xor_encrypt_decrypt(encrypted, key)  # decrypt
+            out_path = enc_path.replace(".enc.txt", ".dec.txt")  # output filename
+            write_binary_file(out_path, decrypted)  # save result
+            st.success("Decryption successful!")
+            st.download_button("Download Decrypted File", data=open(out_path, "rb"), file_name=os.path.basename(out_path))  # download option
+        except Exception as e:
+            st.error(f"Error: {e}")  # show error message if any issue occurs
+
+# -------- Compare Encryption --------
+elif menu == "Compare Random vs Pseudo-Random":
+    st.header("📊 Compare Encryption Methods")  # title of the comparison page
+    uploaded_file = st.file_uploader("Upload any file to analyze", type=["txt", "csv", "jpg", "jpeg", "png", "bmp"])  # upload file for analysis
+    seed = st.text_input("Enter seed for pseudo-random key", value="pseudo123")  # input seed value
+
+    if uploaded_file and st.button("Compare Now"):  # proceed when both are provided
+        file_path = save_file(uploaded_file)  # save the file to local outputs/
+        with open(file_path, "rb") as f:
+            files = {'file': (uploaded_file.name, f)}  # prepare file data for sending
+            data = {'seed': seed}  # seed to be sent to server
+            response = requests.post("http://127.0.0.1:5000/compare", files=files, data=data)  # send post request to Flask backend
+
+        if response.status_code == 200:  # if success (code 200)
+            result = response.json()  # read returned JSON
+
+            # Show stats for random key
+            st.subheader("🔐 Random Key:")
+            st.write(f"• Entropy: `{result['random']['entropy']}`")
+            st.write(f"• Time: `{result['random']['encryption_time']}s`")
+
+            # Show stats for pseudo-random key
+            st.subheader("🧬 Pseudo-Random Key:")
+            st.write(f"• Entropy: `{result['pseudo_random']['entropy']}`")
+            st.write(f"• Time: `{result['pseudo_random']['encryption_time']}s`")
+
+            # Suggest which key type seems more secure
+            st.success(result["recommended"])
+        else:
+            st.error("Server error: " + response.text)  # handle request failure

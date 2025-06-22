@@ -1,11 +1,9 @@
 import os
 import time
 import math
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify
 from werkzeug.utils import secure_filename
 from collections import Counter
-import matplotlib.pyplot as plt
-import pandas as pd
 from TextEncDec import (
     xor_encrypt_decrypt,
     generate_random_key,
@@ -29,12 +27,10 @@ def is_text_file(file_path):
 
 # Function to calculate Shannon entropy of data
 def calculate_entropy(data):
-    # If data is hex string, convert to bytes
     if isinstance(data, str):
         data = bytes.fromhex(data)
     counter = Counter(data)
     length = len(data)
-    # Shannon entropy formula
     entropy = -sum(count/length * math.log2(count/length) for count in counter.values())
     return round(entropy, 4)
 
@@ -110,39 +106,6 @@ def pseudo_encrypt(file_path, is_text, seed):
         "file_size": os.path.getsize(enc_file)
     }
 
-# Generate a comparison bar chart for entropy, encryption time, and file size
-def generate_comparison_chart(rand, pseudo):
-    labels = ['Entropy', 'Encryption Time (s)', 'File Size (bytes)']
-    random_values = [rand['entropy'], rand['encryption_time'], rand['file_size']]
-    pseudo_values = [pseudo['entropy'], pseudo['encryption_time'], pseudo['file_size']]
-
-    x = range(len(labels))
-    width = 0.35
-
-    fig, ax = plt.subplots()
-    ax.bar([i - width/2 for i in x], random_values, width, label='Random Key')
-    ax.bar([i + width/2 for i in x], pseudo_values, width, label='Pseudo-Random Key')
-
-    ax.set_ylabel('Values')
-    ax.set_title('Encryption Comparison Metrics')
-    ax.set_xticks(list(x))
-    ax.set_xticklabels(labels)
-    ax.legend()
-    chart_path = os.path.join(UPLOAD_FOLDER, 'comparison_chart.png')
-    plt.savefig(chart_path)
-    plt.close()
-    return chart_path
-
-# Generate an HTML table summarizing the comparison
-def generate_comparison_table(rand, pseudo):
-    data = {
-        "Metric": ["Entropy", "Encryption Time (s)", "Encrypted File Size (bytes)", "Decrypted File Path"],
-        "Random Key": [rand['entropy'], rand['encryption_time'], rand['file_size'], rand['decrypted_file']],
-        "Pseudo-Random Key": [pseudo['entropy'], pseudo['encryption_time'], pseudo['file_size'], pseudo['decrypted_file']]
-    }
-    df = pd.DataFrame(data)
-    return df.to_html(index=False)
-
 # Route to receive file and perform encryption/decryption comparison
 @app.route('/compare', methods=['POST'])
 def compare_file():
@@ -167,30 +130,15 @@ def compare_file():
     # PSEUDO-RANDOM ENCRYPTION PROCESS
     pseudo_results = pseudo_encrypt(file_path, is_text, seed)
 
-    # Determine which has higher entropy for recommendation
+    # Determine which has higher entropy
     winner = "random" if rand_results["entropy"] > pseudo_results["entropy"] else "pseudo_random"
 
-    # Generate comparison chart and table
-    chart_path = generate_comparison_chart(rand_results, pseudo_results)
-    html_table = generate_comparison_table(rand_results, pseudo_results)
-
-    # Return JSON with results, chart URL, and table HTML
     return jsonify({
         "status": "success",
         "random": rand_results,
         "pseudo_random": pseudo_results,
-        "recommended": f"{winner} key encryption shows higher entropy and may be more secure.",
-        "comparison_chart": "/get_chart",  # endpoint to retrieve the saved chart image
-        "comparison_table": html_table
+        "recommended": f"{winner} key encryption shows higher entropy and may be more secure."
     })
-
-# Route to serve the generated comparison chart image
-@app.route('/get_chart')
-def get_chart():
-    chart_path = os.path.join(UPLOAD_FOLDER, 'comparison_chart.png')
-    if os.path.exists(chart_path):
-        return send_file(chart_path, mimetype='image/png')
-    return "Chart not found", 404
 
 # Entry point for running the Flask app
 if __name__ == '__main__':
