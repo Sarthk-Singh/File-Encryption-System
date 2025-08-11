@@ -19,7 +19,7 @@ from imageEncDec import (  # importing required functions for image encryption
 DOWNLOAD_DIR = "outputs"  # folder where output files will be saved
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)  # create folder if it doesn't exist
 
-st.set_page_config(page_title="SecureCrypt", layout="centered")  # set page title and center the layout of the web page
+st.set_page_config(page_title="SecureCrypt", layout="wide")  # set page title and center the layout of the web page
 
 st.title("🔐 SecureCrypt User Interface")  # display the main title of the page at the top
 
