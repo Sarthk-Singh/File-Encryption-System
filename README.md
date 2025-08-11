@@ -55,14 +55,46 @@ The interface offers:
 
 Start the comparison server:
 ```bash
-python backend/compare_encryption.py
+python compare_encryption.py
+```
 
 ### 🌐 Frontend (Streamlit GUI)
 
 In a new terminal, run the frontend:
-
-bash
-Copy
-Edit
+```
 streamlit run SecureCrypt.py
-This will open the interface in your default browser.
+```
+This will launch the user interface in your default browser at http://localhost:8501.
+
+---
+
+### 📂 Project Structure
+
+```
+SecureCrypt/
+├── compare_encryption.py
+├── imageEncDec.py
+├── imageEncDec.py
+├── SecureCrypt.py
+└── README.md
+```
+
+---
+
+### 🔐 Notes
+
+- Keep your keys secure; random keys offer stronger security but are harder to reproduce
+- Pseudo-random keys enable repeatable encryption with the same seed
+- Use the comparison feature to understand key entropy and encryption speed tradeoffs
+
+---
+
+## 🤝 Contributing
+
+Contributions are welcome! Feel free to fork the repository and submit pull requests. For major changes, please open an issue first to discuss what you would like to change.
+
+---
+
+## 📬 Contact
+
+For questions or collaborations, reach out via [GitHub](https://github.com/Sarthk-Singh).
